@@ -1,0 +1,36 @@
+# 环境变量文件（包含敏感信息）
+.env
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 虚拟环境
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 输出文件
+*.jsonl
+!tasks_and_rubrics.jsonl
+
+# 日志
+*.log
+
+# 不需要同步的目录
+report/
+already/
+
+# 临时文件
+*.tmp
+.DS_Store
+
