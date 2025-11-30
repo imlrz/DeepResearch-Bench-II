@@ -16,7 +16,7 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
 
 
 <p align="center">
-  <img src="../paper/main_result.png" alt="Main results overview" width="80%">
+  <img src="assets/main_result.png" alt="Main results overview" width="80%">
 </p>
 
 ---
@@ -75,7 +75,7 @@ After license filtering and quality screening, we retain **132 expert-authored r
 - Ground-truth, expert-aligned rubrics.
 
 <p align="center">
-  <img src="../paper/distribution.png" alt="Topic distribution" width="70%">
+  <img src="assets/distribution.png" alt="Topic distribution" width="70%">
 </p>
 
 ### Rubric Design from Expert Articles
@@ -103,7 +103,7 @@ Rubrics are built through a four-stage pipeline:
 4. **Expert review & refinement** – domain experts ensure that rubrics faithfully represent the article’s core content.
 
 <p align="center">
-  <img src="../paper/method.png" alt="Method overview" width="90%">
+  <img src="assets/method.png" alt="Method overview" width="90%">
 </p>
 
 ---
@@ -141,7 +141,7 @@ The evaluation pipeline in this repo:
   - Per model across the whole run.
 
 <p align="center">
-  <img src="../paper/intro.png" alt="Three-layer framework: recall, analysis, presentation" width="70%">
+  <img src="assets/intro.png" alt="Three-layer framework: recall, analysis, presentation" width="70%">
 </p>
 
 ---
@@ -279,17 +279,29 @@ python run_evaluation.py \
 
 ```text
 DeepResearch-Bench-Next/
-├── gemini_client.py           # Gemini API client (single place that talks to the API)
-├── run_evaluation.py          # Main evaluation script (scoring logic, no API details)
-├── aggregate_scores.py        # Score aggregation utility
-├── tasks_and_rubrics.jsonl    # Tasks and rubrics used for evaluation
-├── report/                    # Example input structure (per-model subdirectories)
-├── pyproject.toml             # Dependency management (uv / pip)
-├── README.md                  # This documentation
-└── .env                       # Local configuration (user-created, ignored by Git)
+├── assets/                    # Images and figures for README
+│   ├── distribution.png
+│   ├── intro.png
+│   ├── main_result.png
+│   └── method.png
+├── report/                    # Input directory for model-generated reports
+│   └── <model_name>/         # Per-model subdirectories
+│       ├── idx-1.pdf         # Model output for task 1
+│       ├── idx-2.docx        # Model output for task 2
+│       └── ...
+├── gemini_client.py           # Gemini API client (handles API calls and multimodal input)
+├── run_evaluation.py          # Main evaluation script (batched rubric scoring logic)
+├── aggregate_scores.py        # Score aggregation utility (produces CSV summaries)
+├── tasks_and_rubrics.jsonl    # Tasks and rubrics (132 expert-derived tasks)
+├── pyproject.toml             # Dependency management (uv / pip / conda)
+├── .env_example               # Example configuration file
+├── .env                       # Local configuration (user-created, ignored by Git)
+├── .gitignore                 # Git ignore rules
+└── README.md                  # This documentation
 ```
 
-> Note: actual input files for models are expected under a directory like `report/<model_name>/idx-*.pdf|docx|...`.
+> **Note**: Place your model-generated reports under `report/<model_name>/idx-*.pdf|docx|html|md|txt|...`.  
+> The subdirectory name becomes the model identifier in output files.
 
 ---
 

@@ -1,7 +1,0 @@
-README.md
-pyproject.toml
-deepresearch_bench_2.egg-info/PKG-INFO
-deepresearch_bench_2.egg-info/SOURCES.txt
-deepresearch_bench_2.egg-info/dependency_links.txt
-deepresearch_bench_2.egg-info/requires.txt
-deepresearch_bench_2.egg-info/top_level.txt

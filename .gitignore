@@ -1,36 +1,42 @@
-# 环境变量文件（包含敏感信息）
-.env
-
-# Python 缓存
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+*.egg
 
-# 虚拟环境
+# Virtual environments
+.venv/
 venv/
-env/
 ENV/
+env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# 输出文件
-*.jsonl
-!tasks_and_rubrics.jsonl
+# OS
+.DS_Store
+Thumbs.db
 
-# 日志
+# Environment files
+.env
+
+# Logs
 *.log
 
-# 不需要同步的目录
-report/
-already/
+# Data and outputs
+*.jsonl
+!tasks_and_rubrics.jsonl
+*.csv
+report/*/
 
-# 临时文件
-*.tmp
-.DS_Store
-
+# UV lock
+uv.lock
