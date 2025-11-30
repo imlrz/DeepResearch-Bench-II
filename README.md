@@ -1,20 +1,186 @@
-# DeepResearch-Bench-2
+<h1 align="center">DeepResearch Bench Next: A Verifiable Rubric Benchmark for Deep Research Agents</h1>
 
-学术内容评分系统，支持多模态输入（PDF、DOCX、图片等），使用 Gemini API 进行智能评判。
+<div align="center">
 
-## 快速开始
+<a href="../LICENSE"><img src="https://img.shields.io/badge/Code_License-MIT-blue" alt="license"></a>
+<a href="../paper/main.pdf"><img src="https://img.shields.io/badge/Paper-PDF-b5212f.svg?logo=latex" alt="paper-pdf"></a>
+<a href="https://huggingface.co"><img alt="Dataset" src="https://img.shields.io/badge/🤗%20Dataset-coming%20soon-FF6F00"></a>
+<a href="https://huggingface.co"><img alt="Leaderboard" src="https://img.shields.io/badge/🏆%20Leaderboard-coming%20soon-FFD700"></a>
+<a href="https://arxiv.org"><img src="https://img.shields.io/badge/arXiv-coming%20soon-b5212f.svg?logo=arxiv" alt="arxiv"></a>
 
-### 1. 配置环境（.env）
+</div>
 
-在项目根目录 `DeepResearch-Bench-2` 下创建 `.env` 文件，用于保存 API 配置和运行参数：
+<h5 align="center">
+If you like our project, please give us a star ⭐ on GitHub for the latest update.
+</h5>
+
+
+<p align="center">
+  <img src="../paper/main_result.png" alt="Main results overview" width="80%">
+</p>
+
+---
+
+# ✨ News
+
++ **[Nov 2025] 🎉 DeepResearch Bench Next Evaluation Pipeline Released**  
+  - This repo provides the official evaluation pipeline for **DeepResearch Bench Next**, built on Gemini with fine-grained, verifiable rubrics derived from expert-written research reports.  
+  - It supports **multimodal inputs** (PDF/DOCX/images/text) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
+
+For complete experimental results, model comparisons, and ablation studies, please refer to the main paper (`paper/main.pdf`).
+
+---
+
+## 📖 Overview
+
+DeepResearch Bench Next addresses key limitations of existing deep research benchmarks by combining:
+
+- **Real-world, expert-authored research reports** as the grounding signal.
+- **Fine-grained, fully verifiable rubrics** that do not rely on the judge model’s internal domain knowledge.
+- **Three core dimensions** of deep research quality:
+  - 🔍 **Information Recall** – Can the agent identify, retrieve, and cross-check all key information needed to answer the task?
+  - 🧠 **Analysis** – Can the agent synthesize retrieved information into higher-level conclusions and insights?
+  - 📝 **Presentation** – Can the agent present the information in a structured, readable, and easily verifiable way?
+
+This repository (`DeepResearch-Bench-Next`) contains a **lightweight evaluation pipeline** that:
+
+- Takes model-generated research reports (PDF/DOCX/HTML/TXT/images),  
+- Uses `tasks_and_rubrics.jsonl` to load **task descriptions and rubrics**, and  
+- Invokes Gemini to **score each rubric item** in batches, producing:
+  - Per-task, per-dimension rubric scores, and  
+  - Aggregated CSVs summarizing model performance.
+
+---
+
+## Benchmark Construction
+
+### Topic and Task Design
+
+DeepResearch Bench Next is built on top of the original **DeepResearch Bench** topic distribution and task design:
+
+- We start from **real-world user queries** and task themes collected in the original benchmark.  
+- For each seed task, we search for **expert-written review reports** addressing similar research questions in:
+  - Reputable journals and top conferences,
+  - High-quality institutional or governmental reports.
+
+These source reports are:
+
+- Written by domain experts over weeks or months,  
+- Validated by reviewers, editors, and the broader community,  
+- Released under **CC-BY-4.0** / **CC-BY-4.0-NC** licenses.
+
+After license filtering and quality screening, we retain **132 expert-authored reports**, which become the basis for:
+
+- Task formulations, and  
+- Ground-truth, expert-aligned rubrics.
+
+<p align="center">
+  <img src="../paper/distribution.png" alt="Topic distribution" width="70%">
+</p>
+
+### Rubric Design from Expert Articles
+
+From each expert article, we construct:
+
+- One or more **deep research tasks** that require both information collection and analysis.  
+- A set of **binary rubrics** decomposed across the three dimensions:
+  - Information Recall,
+  - Analysis,
+  - Presentation.
+
+Each rubric is:
+
+1. **Essential** – captures information necessary to correctly answer the task.  
+2. **Atomic** – checks a single fact or inference; complex points are split into smaller rubrics.  
+3. **Content-bearing** – encodes the actual answer, not just a vague topic (e.g., “states that X increased from A to B between years Y and Z”).  
+4. **Numerically precise** – numerical rubrics explicitly specify values and tolerated error ranges.
+
+Rubrics are built through a four-stage pipeline:
+
+1. **LLM extraction** from expert articles, guided by carefully designed prompts.  
+2. **Self-evaluation iteration** – rejecting hallucinated or inconsistent rubrics using the source article as reference.  
+3. **Manual revision** – human annotators refine wording, remove redundancy, and enforce atomicity.  
+4. **Expert review & refinement** – domain experts ensure that rubrics faithfully represent the article’s core content.
+
+<p align="center">
+  <img src="../paper/method.png" alt="Method overview" width="90%">
+</p>
+
+---
+
+## Evaluation Framework
+
+DeepResearch Bench Next uses **LLM-as-judge with verifiable rubrics**:
+
+1. The **task + rubric** are serialized into a structured JSON prompt.  
+2. The **model report** (PDF/DOCX/image/text) is provided as the passage (possibly as multimodal attachments).  
+3. Gemini is prompted to output, for **each rubric item**:
+   - `score ∈ {1, 0, -1}`,
+   - `reason`, and
+   - `evidence` (supporting sentences from the report).
+
+Scoring semantics:
+
+- `1` – rubric satisfied with valid evidence and no use of blocked references,  
+- `0` – rubric not mentioned at all,  
+- `-1` – rubric mentioned but evidence relies on explicitly blocked references.
+
+The evaluation pipeline in this repo:
+
+- Handles **multimodal inputs**:
+  - PDFs are uploaded as binary attachments.
+  - DOCX files are parsed into text + tables (Markdown) + extracted images.
+  - Images (PNG/JPEG/WebP/GIF/BMP/TIFF) are attached as inline data.
+  - TXT/MD/HTML are loaded as plain text.
+- Supports **batched evaluation**:
+  - Rubric items are split into batches of size `CHUNK_SIZE` (default 50).
+  - Each batch is evaluated independently; results are merged and re-grouped by dimension.
+- Aggregates **token usage statistics**:
+  - Per batch (`usageMetadata`),  
+  - Per file, and  
+  - Per model across the whole run.
+
+<p align="center">
+  <img src="../paper/intro.png" alt="Three-layer framework: recall, analysis, presentation" width="70%">
+</p>
+
+---
+
+## 📊 Evaluation Results
+
+This repository focuses on the **evaluation pipeline**.  
+Aggregated scores (per-task, per-dimension, and per-model) can be produced locally via `aggregate_scores.py`.
+
+For full experimental details, including:
+
+- Cross-model comparison,  
+- Dimension-wise analysis,  
+- Error cases and ablations,
+
+please refer to the paper (`paper/main.pdf`) and any public leaderboard associated with DeepResearch Bench Next.
+
+---
+
+## 🛠️ Installation and Usage
+
+### Prerequisites
+
+- Python **3.9+**
+- A Gemini-compatible API endpoint and token
+
+---
+
+### 1. Environment configuration (`.env`)
+
+Create a `.env` file in the project root `DeepResearch-Bench-Next` to store API configuration and runtime parameters:
 
 ```bash
-cd DeepResearch-Bench-2
+cd DeepResearch-Bench-Next
 touch .env
-vim .env  # 或用你喜欢的编辑器
+vim .env  # or use your favorite editor
 ```
 
-**必需配置**（请替换为你自己的值）：
+**Required config** (replace with your own values):
 
 ```bash
 GEMINI_API_URL=https://your-api-endpoint.com/v1/chat/completions
@@ -22,291 +188,219 @@ GEMINI_API_TOKEN=your-api-token
 GEMINI_MODEL=gemini-2.5-pro
 GEMINI_REQUEST_ID=eval-request-id
 
-PDF_DIR=grok
-OUT_JSONL=eval_result_grok.jsonl
+PDF_DIR=report
+OUT_JSONL=result.jsonl
 TASKS_JSONL=tasks_and_rubrics.jsonl
 CHUNK_SIZE=50
 MAX_WORKERS=10
 MAX_RETRIES=5
 MAX_PAPER_CHARS=150000
+LOG_FILE=run_evaluation.log
 ```
 
-### 2. 安装依赖（支持 uv）
+---
 
-#### 方式 A：使用 uv（推荐）
+### 2. Install dependencies (supports `uv` / conda)
 
-项目已提供 `pyproject.toml`，可以直接用 `uv` 管理虚拟环境和依赖：
+#### Option A: Use `uv` (recommended)
+
+The project ships with `pyproject.toml`, so you can manage the virtual environment and dependencies via `uv`:
 
 ```bash
-# 安装 uv（如果尚未安装）
+# Install uv (if not installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 创建/同步虚拟环境并安装依赖
-cd DeepResearch-Bench-2
+# Create/sync virtual environment and install dependencies
+cd DeepResearch-Bench-Next
 uv sync
 ```
 
-##### 如何检查 uv 是否安装成功？
+##### How to check whether `uv` is installed correctly
 
-在终端执行以下命令（任意一个或全部）：
+Run any of the following commands in your terminal:
 
 ```bash
-# 1. 查看版本（推荐）
+# 1. Check version (recommended)
 uv --version
 
-# 2. 查看可执行文件路径
+# 2. Check executable path
 which uv
 
-# 3. 查看帮助信息
+# 3. Show help
 uv --help
 ```
 
-- 如果 `uv --version` 输出类似 `uv 0.x.y`，说明安装成功；
-- 如果提示 `command not found` 或找不到命令，说明未安装或未加入 `PATH`。
+- If `uv --version` prints something like `uv 0.x.y`, it is installed correctly.
+- If you see `command not found` or similar, `uv` is not installed or not on your `PATH`.
 
-#### 方式 B：使用 pip
+#### Option B: Use `conda`
 
 ```bash
+# Create and activate a conda environment
+conda create -n drbench-next python=3.10 -y
+conda activate drbench-next
+
+# Install Python dependencies
+cd DeepResearch-Bench-Next
 pip install requests python-docx
 ```
 
-### 3. 运行评估
+You can then run all commands inside this conda environment.
 
-#### 用 uv 运行（推荐）
+---
+
+### 3. Run evaluation
+
+#### Run via `uv` (recommended)
 
 ```bash
-cd DeepResearch-Bench-2
+cd DeepResearch-Bench-Next
 uv run python run_evaluation.py
 ```
 
-#### 直接用 python 运行
+#### Run directly with `python`
 
 ```bash
-cd DeepResearch-Bench-2
+cd DeepResearch-Bench-Next
 
-# 使用 .env 配置运行
+# Use configuration from .env
 python run_evaluation.py
 
-# 或通过命令行参数覆盖配置
+# Or override configuration via CLI arguments
 python run_evaluation.py \
     --pdf_dir grok \
     --out_jsonl result.jsonl \
     --chunk_size 50
 ```
 
-## 功能特性
+---
 
-### ✅ 多模态支持
-- **PDF 文件**：直接作为附件上传，保留完整的图片和表格信息
-- **DOCX 文件**：自动提取文本、表格（转 Markdown）和图片
-- **图片文件**：支持 PNG、JPEG、WebP、GIF、BMP、TIFF
-- **文本文件**：支持 TXT、MD、HTML
+## Project Structure
 
-### ✅ 配置管理
-- 使用 `.env` 文件管理敏感配置
-- 支持环境变量和命令行参数覆盖
-- 灵活的配置优先级机制
-
-### ✅ 高性能
-- 分批评判（避免超长上下文）
-- 多线程并发处理
-- 自动重试机制
-- 详细的进度日志
-
-### ✅ 模块化设计
-- API 客户端独立封装（`gemini_client.py`）
-- 清晰的接口定义（`GeminiInput` / `GeminiOutput`）
-- 易于扩展到其他 AI 模型
-
-## 文件结构
-
-```
-DeepResearch-Bench-2/
-├── gemini_client.py           # Gemini API 客户端（仅一处负责调用 API）
-├── run_evaluation.py          # 主评估脚本（评测逻辑，不含任何 API 细节）
-├── aggregate_scores.py        # 分数聚合工具
-├── tasks_and_rubrics.jsonl    # 任务和评分标准
-├── human/                     # 输入数据（各模型生成的文本/PDF/DOCX 等）
-├── pyproject.toml             # 使用 uv / pip 管理依赖的配置
-├── README.md                  # 本文档
-└── .env                       # 实际配置（需用户自行创建，已在 .gitignore 中）
+```text
+DeepResearch-Bench-Next/
+├── gemini_client.py           # Gemini API client (single place that talks to the API)
+├── run_evaluation.py          # Main evaluation script (scoring logic, no API details)
+├── aggregate_scores.py        # Score aggregation utility
+├── tasks_and_rubrics.jsonl    # Tasks and rubrics used for evaluation
+├── report/                    # Example input structure (per-model subdirectories)
+├── pyproject.toml             # Dependency management (uv / pip)
+├── README.md                  # This documentation
+└── .env                       # Local configuration (user-created, ignored by Git)
 ```
 
-## 配置说明
+> Note: actual input files for models are expected under a directory like `report/<model_name>/idx-*.pdf|docx|...`.
 
-### .env 配置项
+---
 
-| 配置项 | 说明 | 是否必需 | 默认值 |
-|--------|------|----------|--------|
-| `GEMINI_API_URL` | API 端点 URL | ✅ 必需 | - |
-| `GEMINI_API_TOKEN` | API 访问令牌 | ✅ 必需 | - |
-| `GEMINI_MODEL` | 模型名称 | ✅ 必需 | - |
-| `GEMINI_REQUEST_ID` | 请求标识符 | ❌ 可选 | `default-request` |
-| `PDF_DIR` | 输入目录 | ❌ 可选 | `grok` |
-| `OUT_JSONL` | 输出文件 | ❌ 可选 | `eval_result_grok.jsonl` |
-| `TASKS_JSONL` | 任务文件 | ❌ 可选 | `tasks_and_rubrics.jsonl` |
-| `CHUNK_SIZE` | 分批大小 | ❌ 可选 | `50` |
-| `MAX_WORKERS` | 最大并发数 | ❌ 可选 | `10` |
-| `MAX_RETRIES` | 最大重试次数 | ❌ 可选 | `5` |
-| `MAX_PAPER_CHARS` | 文本最大长度 | ❌ 可选 | `150000` |
-| `LOG_FILE` | 日志文件路径（所有控制台输出会同步写入） | ❌ 可选 | `run_evaluation.log` |
+## Quick Start
 
-## 使用示例
+### 1. Prepare your model outputs
 
-### 基本使用
+Organize your model-generated reports under `PDF_DIR` (default `grok`) with the following structure:
+
+```text
+PDF_DIR/
+├── ModelA/
+│   ├── idx-1.pdf
+│   ├── idx-2.pdf
+│   └── ...
+└── ModelB/
+    ├── idx-1.pdf
+    ├── idx-2.pdf
+    └── ...
+```
+
+- Subdirectory name = **model name** (used in output JSONL).  
+- File name pattern = `idx-<task_idx>.<ext>` where `<ext>` can be `pdf`, `docx`, `html`, `md`, `txt`, or an image type.
+
+### 2. Run the evaluator
 
 ```bash
-# 1. 配置 .env
-cp .env.example .env
-vim .env
-
-# 2. 运行评估
-python run_evaluation.py
+python run_evaluation.py \
+  --pdf_dir report \
+  --out_jsonl result.jsonl \
+  --chunk_size 50 \
+  --max_workers 10
 ```
 
-### 自定义参数
+This produces a JSONL file where each line has the form:
+
+```json
+{"model": "ModelA", "idx": 1, "result": {...}}
+```
+
+### 3. Aggregate scores
+
+After you have a merged JSONL of evaluation results (e.g., `merged.jsonl`), run:
 
 ```bash
-# 指定输入输出路径
-python run_evaluation.py \
-    --pdf_dir my_data \
-    --out_jsonl my_result.jsonl
-
-# 调整性能参数
-python run_evaluation.py \
-    --chunk_size 30 \
-    --max_workers 5 \
-    --max_retries 3
-
-# 覆盖模型配置
-python run_evaluation.py \
-    --model gemini-2.0-flash
+python aggregate_scores.py \
+  --input merged.jsonl \
+  --output-prefix analysis/agg_scores \
+  --tasks-file tasks_and_rubrics.jsonl
 ```
 
-### 编程式使用
+This will generate multiple CSVs:
 
-```python
-from gemini_client import GeminiClient, GeminiInput
+- `agg_scores_inforecall.csv`
+- `agg_scores_analysis.csv`
+- `agg_scores_presentation.csv`
+- `agg_scores_total.csv`
+- `agg_scores_blocked.csv`
 
-# 初始化客户端（从 .env 读取配置）
-client = GeminiClient()
+Each CSV summarizes model performance by task (`idx`), including:
 
-# 发送查询
-input_data = GeminiInput(
-    text="请分析这个文档",
-    file_path="document.pdf"
-)
-output = client.query(input_data)
+- Per-dimension scores,  
+- Overall averages,  
+- Blocked-rate statistics.
 
-print(f"回复：{output.text}")
-print(f"Token 使用：{output.usage_metadata}")
-```
+---
 
-## 输出格式
+## Output Format
 
-评估结果保存为 JSONL 格式：
+Evaluation results are stored as JSON Lines (`.jsonl`):
 
 ```jsonl
 {"model": "model_name", "idx": 1, "result": {...}}
 {"model": "model_name", "idx": 2, "result": {...}}
 ```
 
-每个 result 包含：
-- `task`: 任务描述
-- `scores`: 按维度组织的评分结果
-  - `info_recall`: 信息回忆维度
-  - `analysis`: 分析维度
-  - `presentation`: 呈现维度
-- `usage_summary`: Token 使用统计
-- `usage_metadata_per_batch`: 每批次详细统计
+For each line:
 
-## 常见问题
+- `model`: model identifier (derived from the subdirectory name under `PDF_DIR`)  
+- `idx`: task index (parsed from the file name, e.g., `idx-1.pdf`)  
+- `result`: a dict with:
+  - `task`: task description
+  - `scores`: rubric scores grouped by dimensions:
+    - `info_recall`
+    - `analysis`
+    - `presentation`
+  - `usage_summary`: aggregated token usage across all batches
+  - `usage_metadata_per_batch`: raw `usageMetadata` for each batch
 
-### Q: 如何配置 API 密钥？
-A: 创建 `.env` 文件并设置 `GEMINI_API_TOKEN`。详见 [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)
+The helper script `aggregate_scores.py` can then produce CSV summaries from a merged JSONL.
 
-### Q: 支持哪些文件格式？
-A: 支持 PDF、DOCX、PNG、JPEG、WebP、GIF、BMP、TIFF、TXT、MD、HTML。
+---
 
-### Q: 如何查看上传了什么内容？
-A: 运行时会打印 `[上传]` 日志，显示文本段数和文件类型。
+## Acknowledgements
 
-### Q: PDF 中的图片会丢失吗？
-A: 不会。PDF 以附件形式完整上传到 Gemini，图片和表格都会保留。
+DeepResearch Bench Next builds on the ideas and infrastructure of **DeepResearch Bench** and related benchmarks.  
+We thank all authors and annotators involved in collecting tasks, source articles, and rubrics.
 
-### Q: DOCX 中的图片如何处理？
-A: 自动提取并作为额外的图片附件一起上传。
+---
 
-### Q: 如何提高处理速度？
-A: 调整 `MAX_WORKERS` 增加并发数，或调整 `CHUNK_SIZE` 减少批次数。
+## Citation
 
-### Q: 遇到 Rate Limit 错误怎么办？
-A: 减少 `MAX_WORKERS` 并发数，增加重试次数 `MAX_RETRIES`。
+If you use DeepResearch Bench Next or this evaluation pipeline in your research, please cite:
 
-## 文档索引
-
-- **[README_CLIENT.md](README_CLIENT.md)** - Gemini Client 详细使用文档
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - 配置管理完整指南
-- **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - 代码重构说明
-- **[example_client_usage.py](example_client_usage.py)** - 客户端使用示例代码
-
-## 安全提示
-
-⚠️ **重要**：
-1. **不要**将 `.env` 文件提交到 Git（已在 `.gitignore` 中）
-2. **不要**在代码中硬编码 API 密钥
-3. **不要**在公开场合分享 API 密钥
-4. 定期更换 API 密钥
-5. 限制 `.env` 文件权限：`chmod 600 .env`
-
-## 开发指南
-
-### 添加新的 AI 模型支持
-
-1. 创建新的 Client 类（例如 `OpenAIClient`）
-2. 实现相同的接口（`query` 方法）
-3. 使用相同的 `Input/Output` 数据类
-4. 在 `run_evaluation.py` 中根据配置选择 Client
-
-示例：
-```python
-class OpenAIClient:
-    def query(self, input_data: GeminiInput) -> GeminiOutput:
-        # 实现 OpenAI API 调用
-        pass
+```bibtex
+@article{du2025deepresearch,
+  author    = {xxx},
+  title     = {DeepResearch Bench Next: Leveraging Expert-Written Research Reports to Design Verifiable Rubrics},
+  journal   = {arXiv preprint},
+  year      = {2025},
+}
 ```
 
-### 运行测试
 
-```bash
-# 运行示例代码
-python example_client_usage.py
-
-# 测试单个文件
-python -c "
-from gemini_client import GeminiClient, GeminiInput
-client = GeminiClient()
-output = client.query(GeminiInput(text='Hello'))
-print(output.text)
-"
-```
-
-## 许可证
-
-（根据项目实际情况添加）
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 更新日志
-
-### v2.0.0 (2024)
-- ✅ 重构代码，API 客户端独立
-- ✅ 支持 .env 配置管理
-- ✅ 增强 DOCX 图片提取
-- ✅ PDF 默认附件上传
-- ✅ 完善文档和示例
-
-### v1.0.0
-- 初始版本

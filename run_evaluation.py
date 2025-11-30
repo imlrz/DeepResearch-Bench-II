@@ -11,22 +11,21 @@ from typing import Dict, List, Tuple, Optional
 from gemini_client import GeminiClient, GeminiInput, GeminiOutput, get_config
 
 # =========================
-# 全局变量
+# Global variables
 # =========================
-# Client 实例（在 main 函数中初始化）
+# Client instance (initialized in main)
 client: Optional[GeminiClient] = None
 
 
-# 从 .env 读取配置（带默认值）
 def get_default_config():
-    """从 .env 文件获取默认配置"""
+    """Get default configuration values from the .env file (with defaults)."""
     return {
-        'pdf_dir': get_config('PDF_DIR', 'grok'),
-        'out_jsonl': get_config('OUT_JSONL', 'eval_result_grok.jsonl'),
+        'pdf_dir': get_config('PDF_DIR', 'report'),
+        'out_jsonl': get_config('OUT_JSONL', 'result.jsonl'),
         'tasks_jsonl': get_config('TASKS_JSONL', 'tasks_and_rubrics.jsonl'),
         'chunk_size': int(get_config('CHUNK_SIZE', '50')),
         'max_workers': int(get_config('MAX_WORKERS', '10')),
-        'max_retries': int(get_config('MAX_RETRIES', '5')),
+        'max_retries': int(get_config('MAX_RETRIES', '10')),
         'max_paper_chars': int(get_config('MAX_PAPER_CHARS', '150000')),
         'log_file': get_config('LOG_FILE', 'run_evaluation.log'),
     }
@@ -34,11 +33,11 @@ def get_default_config():
 
 def setup_print_logger(log_file: str):
     """
-    简单日志机制：将所有 print 输出同时写入日志文件。
+    Simple logging helper: mirror all print output into a log file.
 
-    - 不改变现有的 print 调用习惯；
-    - 控制台仍然正常输出；
-    - 每一行 print 的文本会追加写入 log_file。
+    - Does not change existing usage of print;
+    - Console output still works as usual;
+    - Each printed line will be appended to log_file.
     """
     if not log_file:
         return
@@ -47,25 +46,25 @@ def setup_print_logger(log_file: str):
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
 
-    # 避免重复包一层
+    # Avoid wrapping print multiple times
     if getattr(builtins, "_orig_print", None) is None:
         builtins._orig_print = builtins.print
 
     def logged_print(*args, **kwargs):
-        # 先输出到控制台
+        # First print to console
         builtins._orig_print(*args, **kwargs)
         try:
             text = " ".join(str(a) for a in args)
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(text + "\n")
         except Exception:
-            # 日志异常不影响主流程
+            # Logging failures must not break main flow
             pass
 
     builtins.print = logged_print
 
 # =========================
-# 提示词模板（三分类）
+# Prompt template (three-way classification)
 # =========================
 PROMPT_TEMPLATE = """
 You will receive an article, a task, and a list of grading rubric items. Your job is to assess whether the article satisfies each rubric item, and provide a THREE-WAY score for EACH rubric item.
@@ -125,16 +124,16 @@ CRITICAL: You MUST return results for ALL rubric items in the input, and the "ru
 Now, please begin your generation
 """
 
-PAPER_PLACEHOLDER = "（PDF 已附在本条消息；请将其全文视作 <passage> 的内容进行查找与修改。）"
+PAPER_PLACEHOLDER = "(The PDF is attached to this message; please treat its full content as the <passage> text when searching and editing.)"
 
 # =========================
-# 读取 tasks.jsonl 索引
+# Load tasks.jsonl index
 # =========================
 def load_tasks_data(path: str):
     tasks_data = {}
     original_data = {}
     if not os.path.exists(path):
-        print(f"[warn] 未找到 {path}，将默认全部跳过处理")
+        print(f"[warn] tasks file not found: {path}, skip all items by default")
         return tasks_data, original_data
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -155,73 +154,75 @@ def load_tasks_data(path: str):
                 continue
     return tasks_data, original_data
 
-# 延迟加载（在 main 中加载）
+# Lazy load (populated in main)
 TASKS_DATA = {}
 ORIGINAL_DATA = {}
 
 # =========================
-# 文档内容提取
+# Document content extraction
 # =========================
 def _extract_docx_content(path: str) -> Tuple[str, List[Tuple[str, bytes]]]:
     """
-    提取 docx 内容，返回 (文本内容, [(图片mime, 图片bytes)])
+    Extract content from a .docx file.
+
+    Returns:
+        (text_content, [(image_mime, image_bytes)]).
     """
     try:
         from docx import Document  # python-docx
     except Exception as e:
-        print(f"[warn] 未安装 python-docx，无法解析 .docx：{e}")
+        print(f"[warn] python-docx is not installed, cannot parse .docx: {e}")
         return "", []
     try:
         doc = Document(path)
     except Exception as e:
-        print(f"[warn] 读取 .docx 失败：{e}")
+        print(f"[warn] failed to read .docx file: {e}")
         return "", []
     
-    # 提取所有内容（段落 + 表格，按文档顺序）
+    # Extract all contents (paragraphs + tables, in document order)
     all_content = []
     images = []
     
-    # 提取所有图片
+    # Extract all images
     for rel in doc.part.rels.values():
         if "image" in rel.target_ref:
             try:
                 image_blob = rel.target_part.blob
-                # 从关系中获取 content_type
+                # Get content_type from the relationship
                 content_type = rel.target_part.content_type
                 images.append((content_type, image_blob))
             except Exception as e:
-                print(f"[warn] 提取图片失败：{e}")
+                print(f"[warn] failed to extract image: {e}")
     
-    # 遍历文档中的所有元素（段落和表格）
+    # Iterate over all elements in the document body (paragraphs and tables)
     for element in doc.element.body:
-        # 段落
+        # Paragraphs
         if element.tag.endswith('p'):
-            # 找到对应的 Paragraph 对象
+            # Find the corresponding Paragraph object
             for p in doc.paragraphs:
                 if p._element == element:
                     text = (p.text or "").strip()
                     if text:
                         all_content.append(text)
                     break
-        # 表格
+        # Tables
         elif element.tag.endswith('tbl'):
-            # 找到对应的 Table 对象
+            # Find the corresponding Table object
             for table in doc.tables:
                 if table._element == element:
-                    # 提取表格内容（转为 Markdown 格式）
+                    # Extract table content and convert to Markdown format
                     table_text = _table_to_markdown(table)
                     if table_text:
                         all_content.append(table_text)
                     break
     
     content = "\n\n".join(all_content)
-    # 注意：截断逻辑已移到调用处，这里返回完整内容
     
     return content, images
 
 def _table_to_markdown(table) -> str:
     """
-    将 docx 表格转换为 Markdown 格式的文本
+    Convert a docx table into Markdown formatted text.
     """
     if not table.rows:
         return ""
@@ -229,9 +230,9 @@ def _table_to_markdown(table) -> str:
     lines = []
     for i, row in enumerate(table.rows):
         cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
-        # 用 | 分隔单元格
+        # Use | to separate cells
         lines.append("| " + " | ".join(cells) + " |")
-        # 第一行后添加分隔线
+        # Add separator line after the first row
         if i == 0:
             lines.append("| " + " | ".join(["---"] * len(cells)) + " |")
     
@@ -240,7 +241,7 @@ def _table_to_markdown(table) -> str:
 
 
 # =========================
-# JSON fenced block 抽取/解析
+# JSON fenced block extraction / parsing
 # =========================
 FENCED_JSON_PATTERN = r'```json\s*(.*)```'
 
@@ -258,19 +259,19 @@ def parse_model_text(text: str):
         try:
             return _try_clean_and_load(matches[0]), True
         except json.JSONDecodeError as e:
-            print(f"[warn] fenced JSON 解析失败：{e}；尝试全文解析……")
+            print(f"[warn] failed to parse fenced JSON: {e}; trying full text...")
     try:
         return _try_clean_and_load(text), True
     except json.JSONDecodeError as e:
-        print(f"[warn] 全文 JSON 解析失败：{e}")
+        print(f"[warn] failed to parse JSON from full text: {e}")
         return None, False
 
 # =========================
-# 分批评判与验证
+# Batched evaluation and validation
 # =========================
 def validate_batch_result(rubric_items: List[str], parsed_result: Dict) -> bool:
     """
-    验证模型返回是否包含所有 rubric_items，且文本严格匹配
+    Validate that the model output contains all rubric_items with exact text match.
     """
     if not isinstance(parsed_result, dict):
         return False
@@ -283,6 +284,7 @@ def validate_batch_result(rubric_items: List[str], parsed_result: Dict) -> bool:
     # 检查每个 rubric_item 是否严格匹配
     returned_items = [r.get("rubric_item", "") for r in results]
     for expected in rubric_items:
+        # Ensure every rubric_item from the input is present in the results
         if expected not in returned_items:
             return False
     
@@ -293,12 +295,15 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
                        extra_images: List[Tuple[str, bytes]] = None,
                        max_retries: int = 5) -> Tuple[Optional[List[Dict]], Dict]:
     """
-    查询一批 rubric 条目，返回 (results_list, usage_metadata)
-    最多重试 max_retries 次
+    Query a batch of rubric items.
+
+    Returns:
+        (results_list, usage_metadata).
+    Retries up to max_retries times.
     """
     global client
     if client is None:
-        raise RuntimeError("GeminiClient 未初始化")
+        raise RuntimeError("GeminiClient is not initialized")
     
     rubric_input = {
         "task": task,
@@ -309,9 +314,9 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
     
     for attempt in range(max_retries):
         try:
-            # 构造输入
+            # Build input
             if pdf_path:
-                # 有文件附件
+                # With file attachment
                 prompt = PROMPT_TEMPLATE.format(paper=PAPER_PLACEHOLDER, rubric=rubric_json)
                 input_data = GeminiInput(
                     text=prompt,
@@ -319,62 +324,64 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
                     extra_images=extra_images
                 )
             else:
-                # 纯文本
+                # Text-only
                 prompt = PROMPT_TEMPLATE.format(paper=paper_content, rubric=rubric_json)
                 input_data = GeminiInput(
                     text=prompt,
                     extra_images=extra_images
                 )
             
-            # 调用 Client
+            # Call the client
             output = client.query(input_data)
             
             if not output.text:
-                print(f"[warn] 批次尝试 {attempt+1}/{max_retries} 无文本内容")
+                print(f"[warn] batch attempt {attempt+1}/{max_retries} returned empty text")
                 continue
             
-            # 解析 JSON
+            # Parse JSON
             parsed, ok = parse_model_text(output.text)
             if not ok:
-                print(f"[warn] 批次尝试 {attempt+1}/{max_retries} JSON 解析失败")
+                print(f"[warn] batch attempt {attempt+1}/{max_retries} JSON parse failed")
                 continue
             
-            # 验证结果
+            # Validate result
             if not validate_batch_result(rubric_items, parsed):
-                print(f"[warn] 批次尝试 {attempt+1}/{max_retries} 验证失败：rubric_item 不匹配或数量不对")
+                print(f"[warn] batch attempt {attempt+1}/{max_retries} validation failed: rubric_item mismatch or wrong count")
                 continue
             
-            # 成功
+            # Success
             return parsed["results"], output.usage_metadata
             
         except Exception as e:
-            print(f"[warn] 批次尝试 {attempt+1}/{max_retries} 请求异常：{e}")
+            print(f"[warn] batch attempt {attempt+1}/{max_retries} request error: {e}")
             continue
     
-    # 所有尝试失败
+    # All attempts failed
     return None, {}
 
 # =========================
-# 单文件处理（分批版本）
+# Per-file processing (batched version)
 # =========================
 def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chunk_size: int = 0, max_paper_chars: int = 150000, max_retries: int = 5):
     """
-    处理单个文件，支持分批评判（Gemini 多模态）
-    返回：(idx, result_dict, total_tokens)
-    result_dict 包含 scores（按维度组织）和 total_tokens
+    Process a single file, with batched evaluation (Gemini multimodal).
+
+    Returns:
+        (idx, result_dict, total_tokens)
+    where result_dict contains scores (organized by dimension) and total_tokens.
     """
-    print(f"[run] 处理 idx={idx}，文件={os.path.basename(pdf_path)}，chunk_size={chunk_size}")
+    print(f"[run] processing idx={idx}, file={os.path.basename(pdf_path)}, chunk_size={chunk_size}")
     
-    # 解析 rubric_content
+    # Parse rubric_content
     if not isinstance(rubric_content, dict):
-        print(f"[err] idx={idx} rubric_content 格式错误")
+        print(f"[err] idx={idx} rubric_content has invalid format")
         return idx, {"error": "invalid rubric_content"}, 0
     
     task = rubric_content.get("task", "")
     rubric = rubric_content.get("rubric", {})
     blocked = rubric_content.get("blocked", {})
     
-    # 提取所有 rubric 条目（混合所有维度）
+    # Collect all rubric items (across all dimensions)
     all_items = []
     dimension_map = {}  # rubric_item -> dimension
     for dim in ["info_recall", "analysis", "presentation"]:
@@ -385,62 +392,62 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
                 dimension_map[item] = dim
     
     if not all_items:
-        print(f"[warn] idx={idx} 无 rubric 条目")
+        print(f"[warn] idx={idx} has no rubric items")
         return idx, {"error": "no rubric items"}, 0
     
-    # 准备文档内容（多模态策略）
+    # Prepare document content (multimodal strategy)
     text_content = ""
     file_to_upload = None
     extra_images = []
     lower_name = pdf_path.lower()
     
     if lower_name.endswith('.pdf'):
-        # PDF 默认作为附件上传
+        # For PDF, upload the file as an attachment by default
         file_to_upload = pdf_path
-        print(f"[info] idx={idx} PDF 文件将作为附件上传")
+        print(f"[info] idx={idx} PDF will be uploaded as an attachment")
     elif lower_name.endswith('.docx'):
-        # DOCX 提取文本、表格和图片
+        # For DOCX, extract text, tables and images
         text_content, extra_images = _extract_docx_content(pdf_path)
-        print(f"[info] idx={idx} DOCX 提取：文本长度={len(text_content)}，图片数量={len(extra_images)}")
+        print(f"[info] idx={idx} DOCX extracted: text_length={len(text_content)}, image_count={len(extra_images)}")
         if not text_content and not extra_images:
-            # 如果提取失败，尝试作为附件上传
-            print(f"[warn] idx={idx} DOCX 提取失败，尝试作为纯文本")
+            # If extraction fails, fall back to plain text
+            print(f"[warn] idx={idx} DOCX extraction failed, trying as plain text")
     elif lower_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff')):
-        # 图片文件
+        # Image file
         file_to_upload = pdf_path
-        print(f"[info] idx={idx} 图片文件将作为附件上传")
+        print(f"[info] idx={idx} image file will be uploaded as an attachment")
     elif lower_name.endswith(('.txt', '.md', '.html')):
-        # 纯文本文件
+        # Plain text file
         try:
             with open(pdf_path, 'r', encoding='utf-8', errors='ignore') as rf:
                 text_content = rf.read()
-            print(f"[info] idx={idx} 文本文件读取：长度={len(text_content)}")
+            print(f"[info] idx={idx} text file read: length={len(text_content)}")
         except Exception as e:
-            print(f"[warn] idx={idx} 读取文本文件失败：{e}")
+            print(f"[warn] idx={idx} failed to read text file: {e}")
             text_content = ""
     else:
-        # 其他未知格式，尝试作为文本读取
-        print(f"[warn] idx={idx} 未知格式，尝试读取为文本")
+        # Unknown format, best-effort text read
+        print(f"[warn] idx={idx} unknown format, trying to read as text")
         try:
             with open(pdf_path, 'r', encoding='utf-8', errors='ignore') as rf:
                 text_content = rf.read()
         except Exception:
             text_content = ""
     
-    # 截断过长文本
+    # Truncate overly long text
     if text_content and len(text_content) > max_paper_chars:
-        print(f"[info] idx={idx} 文本过长（{len(text_content)}），按 {max_paper_chars} 截断")
+        print(f"[info] idx={idx} text too long ({len(text_content)}), truncating to {max_paper_chars}")
         text_content = text_content[:max_paper_chars]
     
-    # 分批处理
+    # Batched processing
     if chunk_size <= 0 or chunk_size >= len(all_items):
-        # 不分批，一次性处理
+        # No batching, process all at once
         batches = [all_items]
     else:
-        # 分批
+        # Split into batches
         batches = [all_items[i:i+chunk_size] for i in range(0, len(all_items), chunk_size)]
     
-    print(f"[info] idx={idx} 共 {len(all_items)} 个条目，分为 {len(batches)} 批")
+    print(f"[info] idx={idx} has {len(all_items)} rubric items, split into {len(batches)} batches")
     
     # 累积结果
     all_results = []
@@ -448,10 +455,10 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
     total_output_tokens = 0
     total_thoughts_tokens = 0
     total_tokens_sum = 0
-    all_usage_metadata = []  # 保存每批次的完整 usageMetadata
+    all_usage_metadata = []  # save full usageMetadata for each batch
     
     for batch_idx, batch_items in enumerate(batches):
-        print(f"[info] idx={idx} 处理批次 {batch_idx+1}/{len(batches)}（{len(batch_items)} 个条目）")
+        print(f"[info] idx={idx} processing batch {batch_idx+1}/{len(batches)} ({len(batch_items)} items)")
         
         results, usage_metadata = query_rubric_batch(
             batch_items, task, blocked, text_content, 
@@ -461,19 +468,19 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
         )
         
         if results is None:
-            print(f"[err] idx={idx} 批次 {batch_idx+1} 失败")
+            print(f"[err] idx={idx} batch {batch_idx+1} failed")
             return idx, {"error": f"batch {batch_idx+1} failed after {max_retries} retries"}, 0
         
         all_results.extend(results)
         all_usage_metadata.append(usage_metadata)
         
-        # 累积各项 token 统计
+        # Accumulate token counts
         total_input_tokens += usage_metadata.get("promptTokenCount", 0)
         total_output_tokens += usage_metadata.get("candidatesTokenCount", 0)
         total_thoughts_tokens += usage_metadata.get("thoughtsTokenCount", 0)
         total_tokens_sum += usage_metadata.get("totalTokenCount", 0)
     
-    # 按维度重新组织结果
+    # Re-organize results by dimension
     scores_by_dimension = {
         "info_recall": {},
         "analysis": {},
@@ -503,44 +510,44 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
             "output_tokens": total_output_tokens,
             "thoughts_tokens": total_thoughts_tokens
         },
-        "usage_metadata_per_batch": all_usage_metadata  # 保存每批次的完整 metadata
+        "usage_metadata_per_batch": all_usage_metadata  # save full metadata for each batch
     }
     
-    print(f"[ok] idx={idx} 完成，总 tokens={total_tokens_sum} (input={total_input_tokens}, output={total_output_tokens}, thoughts={total_thoughts_tokens})")
+    print(f"[ok] idx={idx} finished, total tokens={total_tokens_sum} (input={total_input_tokens}, output={total_output_tokens}, thoughts={total_thoughts_tokens})")
     return idx, result_dict, total_tokens_sum
 
 # =========================
-# 主程序
+# Main entrypoint
 # =========================
 def main():
     global client, TASKS_DATA, ORIGINAL_DATA
     
-    # 获取默认配置
+    # Load default config
     config = get_default_config()
     
-    parser = argparse.ArgumentParser(description="多模型学术内容评分（分批评判）")
-    parser.add_argument("--pdf_dir", default=config['pdf_dir'], help="输入目录（包含模型子目录）")
-    parser.add_argument("--out_jsonl", default=config['out_jsonl'], help="输出 jsonl 文件")
-    parser.add_argument("--tasks_jsonl", default=config['tasks_jsonl'], help="任务和评分标准文件")
-    parser.add_argument("--chunk_size", type=int, default=config['chunk_size'], help="分批大小（0=不分批）")
-    parser.add_argument("--max_workers", type=int, default=config['max_workers'], help="并发数")
-    parser.add_argument("--max_retries", type=int, default=config['max_retries'], help="最大重试次数")
-    parser.add_argument("--max_paper_chars", type=int, default=config['max_paper_chars'], help="文本最大字符长度")
-    parser.add_argument("--log_file", default=config['log_file'], help="日志文件路径（所有控制台输出将同步写入该文件）")
-    parser.add_argument("--model", default=None, help="模型名称（可选，默认从 .env 读取）")
-    parser.add_argument("--api_url", default=None, help="API URL（可选，默认从 .env 读取）")
-    parser.add_argument("--token", default=None, help="API Token（可选，默认从 .env 读取）")
-    parser.add_argument("--req_id", default=None, help="请求标识（可选，默认从 .env 读取）")
+    parser = argparse.ArgumentParser(description="batched evaluation")
+    parser.add_argument("--pdf_dir", default=config['pdf_dir'], help="Input directory (containing per-model subdirectories).")
+    parser.add_argument("--out_jsonl", default=config['out_jsonl'], help="Output JSONL file.")
+    parser.add_argument("--tasks_jsonl", default=config['tasks_jsonl'], help="Tasks and rubrics JSONL file.")
+    parser.add_argument("--chunk_size", type=int, default=config['chunk_size'], help="Batch size for rubric items (0 = no batching).")
+    parser.add_argument("--max_workers", type=int, default=config['max_workers'], help="Number of concurrent workers.")
+    parser.add_argument("--max_retries", type=int, default=config['max_retries'], help="Maximum retry count per batch.")
+    parser.add_argument("--max_paper_chars", type=int, default=config['max_paper_chars'], help="Maximum number of characters to keep from each document.")
+    parser.add_argument("--log_file", default=config['log_file'], help="Log file path (all console output will also be written here).")
+    parser.add_argument("--model", default=None, help="Model name (optional, overrides .env / environment).")
+    parser.add_argument("--api_url", default=None, help="API URL (optional, overrides .env / environment).")
+    parser.add_argument("--token", default=None, help="API token (optional, overrides .env / environment).")
+    parser.add_argument("--req_id", default=None, help="Request identifier (optional, overrides .env / environment).")
     args = parser.parse_args()
     
-    # 初始化打印日志：所有 print 同步写入 log 文件
+    # Initialize print logger: mirror all prints into the log file
     setup_print_logger(args.log_file)
-    print(f"[init] 日志文件：{args.log_file}")
+    print(f"[init] log file: {args.log_file}")
     
-    # 加载任务数据
+    # Load tasks data
     TASKS_DATA, ORIGINAL_DATA = load_tasks_data(args.tasks_jsonl)
     
-    # 初始化 Gemini Client（从 .env 或命令行参数读取配置）
+    # Initialize Gemini client (from .env or CLI overrides)
     try:
         client = GeminiClient(
             api_url=args.api_url,
@@ -549,16 +556,16 @@ def main():
             request_id=args.req_id,
             verbose=True
         )
-        print(f"[init] Gemini Client 已初始化")
-        print(f"  - 模型：{client.model}")
-        print(f"  - API URL：{client.api_url}")
-        print(f"  - 请求 ID：{client.request_id}")
+        print(f"[init] Gemini client initialized")
+        print(f"  - model: {client.model}")
+        print(f"  - API URL: {client.api_url}")
+        print(f"  - request ID: {client.request_id}")
     except ValueError as e:
-        print(f"[err] 初始化失败：{e}")
-        print(f"[提示] 请创建 .env 文件并配置 GEMINI_API_URL / GEMINI_API_TOKEN / GEMINI_MODEL，或通过命令行参数传入配置")
+        print(f"[err] failed to initialize client: {e}")
+        print(f"[hint] Please create a .env file and configure GEMINI_API_URL / GEMINI_API_TOKEN / GEMINI_MODEL, or pass them via CLI arguments.")
         return
     
-    # 使用局部变量
+    # Use local variables for convenience
     pdf_dir = args.pdf_dir
     out_jsonl = args.out_jsonl
     chunk_size = args.chunk_size
@@ -566,7 +573,7 @@ def main():
     max_paper_chars = args.max_paper_chars
     
     if not TASKS_DATA:
-        print(f"[info] 在 {args.tasks_jsonl} 未发现任何任务数据")
+        print(f"[info] no task data found in {args.tasks_jsonl}")
         return
     
     def _parse_idx_from_filename(name: str):
@@ -575,10 +582,10 @@ def main():
     
     pairs = []  # (model, idx, fpath, content)
     if not os.path.isdir(pdf_dir):
-        print(f"[info] 输入目录不存在：{pdf_dir}")
+        print(f"[info] input directory does not exist: {pdf_dir}")
         return
     
-    # 遍历一级目录的子目录，子目录名即 model
+    # Traverse first-level subdirectories; subdirectory name is the model name
     for entry in os.listdir(pdf_dir):
         model_dir = os.path.join(pdf_dir, entry)
         if not os.path.isdir(model_dir):
@@ -594,17 +601,17 @@ def main():
                 pairs.append((model_name, idx_val, fpath, content))
             else:
                 if content is None:
-                    print(f"[skip] 未在 {args.tasks_jsonl} 中找到 idx={idx_val} 的条目（model={model_name}）")
+                    print(f"[skip] idx={idx_val} not found in {args.tasks_jsonl} (model={model_name})")
                 if not os.path.exists(fpath):
-                    print(f"[skip] 文件不存在：{fpath}")
+                    print(f"[skip] file does not exist: {fpath}")
     
     if not pairs:
-        print("[info] 未找到任何可处理的配对")
+        print("[info] no valid (model, idx, file) pairs found; nothing to do")
         return
     
-    print(f"[info] 共发现 {len(pairs)} 个配对，开始并行处理（chunk_size={chunk_size}）……")
+    print(f"[info] found {len(pairs)} valid pairs, start parallel processing (chunk_size={chunk_size})...")
     
-    # 存储处理结果
+    # Store results
     results = {}
     
     with ThreadPoolExecutor(max_workers=min(args.max_workers, len(pairs))) as pool:
@@ -615,11 +622,11 @@ def main():
         for fut in as_completed(future_to_meta.keys()):
             model, _orig_idx = future_to_meta[fut]
             ridx, result_dict, total_tokens = fut.result()
-            # 按 model 分桶，避免不同 model 同 idx 覆盖
+            # Bucket results by model to avoid clashes when different models share the same idx
             results.setdefault(model, {})[ridx] = result_dict
     
-    # 以追加方式写入 jsonl
-    print(f"[info] 以追加方式写入 {out_jsonl}...")
+    # Append results to JSONL
+    print(f"[info] appending results to {out_jsonl}...")
     out_dir = os.path.dirname(out_jsonl)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
@@ -629,7 +636,7 @@ def main():
                 line_obj = {"model": model, "idx": idx, "result": result_dict}
                 f.write(json.dumps(line_obj, ensure_ascii=False) + "\n")
     
-    print(f"[done] 全部处理完成，结果已追加保存到 {out_jsonl}")
+    print(f"[done] processing completed, results appended to {out_jsonl}")
 
 if __name__ == "__main__":
     main()
