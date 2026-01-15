@@ -409,11 +409,13 @@ We thank all authors and annotators involved in collecting tasks, source article
 If you use DeepResearch Bench II or this evaluation pipeline in your research, please cite:
 
 ```bibtex
-@article{du2025deepresearch,
-  author    = {xxx},
-  title     = {DeepResearch Bench II: Leveraging Expert-Written Research Reports to Design Verifiable Rubrics},
-  journal   = {arXiv preprint},
-  year      = {2025},
+@misc{li2026deepresearchbenchiidiagnosing,
+      title={DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Report}, 
+      author={Ruizhe Li and Mingxuan Du and Benfeng Xu and Chiwei Zhu and Xiaorui Wang and Zhendong Mao},
+      year={2026},
+      eprint={2601.08536},
+      archivePrefix={arXiv},
+      url={https://arxiv.org/abs/2601.08536}, 
 }
 ```
 
