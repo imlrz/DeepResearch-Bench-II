@@ -1,12 +1,10 @@
-<h1 align="center">DeepResearch Bench Next: A Verifiable Rubric Benchmark for Deep Research Agents</h1>
+<h1 align="center">DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Report</h1>
 
 <div align="center">
 
-<a href="../LICENSE"><img src="https://img.shields.io/badge/Code_License-MIT-blue" alt="license"></a>
-<a href="../paper/main.pdf"><img src="https://img.shields.io/badge/Paper-PDF-b5212f.svg?logo=latex" alt="paper-pdf"></a>
 <a href="https://huggingface.co"><img alt="Dataset" src="https://img.shields.io/badge/🤗%20Dataset-coming%20soon-FF6F00"></a>
 <a href="https://huggingface.co"><img alt="Leaderboard" src="https://img.shields.io/badge/🏆%20Leaderboard-coming%20soon-FFD700"></a>
-<a href="https://arxiv.org"><img src="https://img.shields.io/badge/arXiv-coming%20soon-b5212f.svg?logo=arxiv" alt="arxiv"></a>
+<a href="https://arxiv.org/abs/2601.08536"><img src="https://img.shields.io/badge/arXiv-2601.08536-b5212f.svg?logo=arxiv" alt="arxiv"></a>
 
 </div>
 
@@ -23,8 +21,8 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
 
 # ✨ News
 
-+ **[Nov 2025] 🎉 DeepResearch Bench Next Evaluation Pipeline Released**  
-  - This repo provides the official evaluation pipeline for **DeepResearch Bench Next**, built on Gemini with fine-grained, verifiable rubrics derived from expert-written research reports.  
++ **[Nov 2025] 🎉 DeepResearch Bench II Evaluation Pipeline Released**  
+  - This repo provides the official evaluation pipeline for **DeepResearch Bench II**, built on Gemini with fine-grained, verifiable rubrics derived from expert-written research reports.  
   - It supports **multimodal inputs** (PDF/DOCX/images/text) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
 
 For complete experimental results, model comparisons, and ablation studies, please refer to the main paper (`paper/main.pdf`).
@@ -33,7 +31,11 @@ For complete experimental results, model comparisons, and ablation studies, plea
 
 ## 📖 Overview
 
-DeepResearch Bench Next addresses key limitations of existing deep research benchmarks by combining:
+<p align="center">
+  <img src="assets/intro.png" alt="Three-layer framework: recall, analysis, presentation" width="70%">
+</p>
+
+DeepResearch Bench II addresses key limitations of existing deep research benchmarks by combining:
 
 - **Real-world, expert-authored research reports** as the grounding signal.
 - **Fine-grained, fully verifiable rubrics** that do not rely on the judge model’s internal domain knowledge.
@@ -42,7 +44,7 @@ DeepResearch Bench Next addresses key limitations of existing deep research benc
   - 🧠 **Analysis** – Can the agent synthesize retrieved information into higher-level conclusions and insights?
   - 📝 **Presentation** – Can the agent present the information in a structured, readable, and easily verifiable way?
 
-This repository (`DeepResearch-Bench-Next`) contains a **lightweight evaluation pipeline** that:
+This repository (`DeepResearch-Bench-II`) contains a **lightweight evaluation pipeline** that:
 
 - Takes model-generated research reports (PDF/DOCX/HTML/TXT/images),  
 - Uses `tasks_and_rubrics.jsonl` to load **task descriptions and rubrics**, and  
@@ -56,7 +58,7 @@ This repository (`DeepResearch-Bench-Next`) contains a **lightweight evaluation 
 
 ### Topic and Task Design
 
-DeepResearch Bench Next is built on top of the original **DeepResearch Bench** topic distribution and task design:
+DeepResearch Bench II is built on top of the original **DeepResearch Bench** topic distribution and task design:
 
 - We start from **real-world user queries** and task themes collected in the original benchmark.  
 - For each seed task, we search for **expert-written review reports** addressing similar research questions in:
@@ -106,11 +108,15 @@ Rubrics are built through a four-stage pipeline:
   <img src="assets/method.png" alt="Method overview" width="90%">
 </p>
 
+<p align="center">
+  <img src="assets/method-1.png" alt="Method overview" width="90%">
+</p>
+
 ---
 
 ## Evaluation Framework
 
-DeepResearch Bench Next uses **LLM-as-judge with verifiable rubrics**:
+DeepResearch Bench II uses **LLM-as-judge with verifiable rubrics**:
 
 1. The **task + rubric** are serialized into a structured JSON prompt.  
 2. The **model report** (PDF/DOCX/image/text) is provided as the passage (possibly as multimodal attachments).  
@@ -140,10 +146,6 @@ The evaluation pipeline in this repo:
   - Per file, and  
   - Per model across the whole run.
 
-<p align="center">
-  <img src="assets/intro.png" alt="Three-layer framework: recall, analysis, presentation" width="70%">
-</p>
-
 ---
 
 ## 📊 Evaluation Results
@@ -157,7 +159,7 @@ For full experimental details, including:
 - Dimension-wise analysis,  
 - Error cases and ablations,
 
-please refer to the paper (`paper/main.pdf`) and any public leaderboard associated with DeepResearch Bench Next.
+please refer to the paper (`paper/main.pdf`) and any public leaderboard associated with DeepResearch Bench II.
 
 ---
 
@@ -172,10 +174,10 @@ please refer to the paper (`paper/main.pdf`) and any public leaderboard associat
 
 ### 1. Environment configuration (`.env`)
 
-Create a `.env` file in the project root `DeepResearch-Bench-Next` to store API configuration and runtime parameters:
+Create a `.env` file in the project root `DeepResearch-Bench-II` to store API configuration and runtime parameters:
 
 ```bash
-cd DeepResearch-Bench-Next
+cd DeepResearch-Bench-II
 touch .env
 vim .env  # or use your favorite editor
 ```
@@ -211,7 +213,7 @@ The project ships with `pyproject.toml`, so you can manage the virtual environme
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create/sync virtual environment and install dependencies
-cd DeepResearch-Bench-Next
+cd DeepResearch-Bench-II
 uv sync
 ```
 
@@ -237,11 +239,11 @@ uv --help
 
 ```bash
 # Create and activate a conda environment
-conda create -n drbench-next python=3.10 -y
-conda activate drbench-next
+conda create -n drbench-II python=3.10 -y
+conda activate drbench-II
 
 # Install Python dependencies
-cd DeepResearch-Bench-Next
+cd DeepResearch-Bench-II
 pip install requests python-docx
 ```
 
@@ -254,14 +256,14 @@ You can then run all commands inside this conda environment.
 #### Run via `uv` (recommended)
 
 ```bash
-cd DeepResearch-Bench-Next
+cd DeepResearch-Bench-II
 uv run python run_evaluation.py
 ```
 
 #### Run directly with `python`
 
 ```bash
-cd DeepResearch-Bench-Next
+cd DeepResearch-Bench-II
 
 # Use configuration from .env
 python run_evaluation.py
@@ -278,7 +280,7 @@ python run_evaluation.py \
 ## Project Structure
 
 ```text
-DeepResearch-Bench-Next/
+DeepResearch-Bench-II/
 ├── assets/                    # Images and figures for README
 │   ├── distribution.png
 │   ├── intro.png
@@ -397,19 +399,19 @@ The helper script `aggregate_scores.py` can then produce CSV summaries from a me
 
 ## Acknowledgements
 
-DeepResearch Bench Next builds on the ideas and infrastructure of **DeepResearch Bench** and related benchmarks.  
+DeepResearch Bench II builds on the ideas and infrastructure of **DeepResearch Bench** and related benchmarks.  
 We thank all authors and annotators involved in collecting tasks, source articles, and rubrics.
 
 ---
 
 ## Citation
 
-If you use DeepResearch Bench Next or this evaluation pipeline in your research, please cite:
+If you use DeepResearch Bench II or this evaluation pipeline in your research, please cite:
 
 ```bibtex
 @article{du2025deepresearch,
   author    = {xxx},
-  title     = {DeepResearch Bench Next: Leveraging Expert-Written Research Reports to Design Verifiable Rubrics},
+  title     = {DeepResearch Bench II: Leveraging Expert-Written Research Reports to Design Verifiable Rubrics},
   journal   = {arXiv preprint},
   year      = {2025},
 }
