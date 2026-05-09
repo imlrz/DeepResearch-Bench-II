@@ -371,6 +371,19 @@ Each CSV summarizes model performance by task (`idx`), including:
 
 
 
+## 📜 License
+
+This project uses a dual-license structure:
+
+- **Code** (evaluation pipeline, scripts, utilities): [Apache License 2.0](LICENSE)
+- **Data** (tasks, rubrics, and annotations): [CC-BY-NC-4.0](DATA_LICENSE)
+
+The data in this benchmark is derived from expert-authored reports released under CC-BY-4.0 / CC-BY-NC-4.0 licenses. Accordingly, all derived data (rubrics, task descriptions, etc.) is distributed under CC-BY-NC-4.0 to respect the upstream NonCommercial constraint.
+
+If you use this benchmark in academic research, you are free to do so under both licenses. Commercial use of the **code** is permitted; commercial use of the **data** is not.
+
+---
+
 ## Acknowledgements
 
 DeepResearch Bench II builds on the ideas and infrastructure of **DeepResearch Bench** and related benchmarks.  
