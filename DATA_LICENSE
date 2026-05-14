@@ -1,5 +1,5 @@
-Creative Commons Attribution-NonCommercial 4.0 International License
-(CC-BY-NC-4.0)
+Creative Commons Attribution 4.0 / Attribution-NonCommercial 4.0 / CC0
+(Per-task license follows the source article)
 
 Copyright 2025-2026 Ruizhe Li and DeepResearch Bench II Contributors
 
@@ -20,27 +20,29 @@ Per-task License:
     - 2 tasks:   CC BY-NC 4.0 (idx=26, idx=110)
     - 1 task:    CC0 / Public Domain (idx=119)
 
-  Because the dataset contains CC BY-NC 4.0 entries, the overall dataset
-  is distributed under CC-BY-NC-4.0 as the most restrictive common
-  denominator.
+  Each task's rubrics and descriptions inherit the license of their
+  source article. For the 129 CC BY 4.0 tasks, commercial use is
+  permitted with attribution. For idx=26 and idx=110 (CC BY-NC 4.0),
+  commercial use is not permitted. For idx=119 (CC0), no restrictions
+  apply.
 
 You are free to:
 
   Share — copy and redistribute the material in any medium or format
   Adapt — remix, transform, and build upon the material
 
-Under the following terms:
+Under the following terms (per task):
 
-  Attribution — You must give appropriate credit, provide a link to the
-  license, and indicate if changes were made. You may do so in any
-  reasonable manner, but not in any way that suggests the licensor
-  endorses you or your use.
+  For CC BY 4.0 tasks:
+    Attribution — You must give appropriate credit, provide a link to
+    the license, and indicate if changes were made.
+    Full text: https://creativecommons.org/licenses/by/4.0/legalcode
 
-  NonCommercial — You may not use the material for commercial purposes.
+  For CC BY-NC 4.0 tasks (idx=26, idx=110):
+    Attribution — Same as above.
+    NonCommercial — You may not use the material for commercial purposes.
+    Full text: https://creativecommons.org/licenses/by-nc/4.0/legalcode
 
-  No additional restrictions — You may not apply legal terms or
-  technological measures that legally restrict others from doing
-  anything the license permits.
-
-Full license text:
-https://creativecommons.org/licenses/by-nc/4.0/legalcode
+  For CC0 tasks (idx=119):
+    No conditions. Public domain.
+    Full text: https://creativecommons.org/publicdomain/zero/1.0/legalcode

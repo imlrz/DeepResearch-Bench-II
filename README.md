@@ -380,7 +380,7 @@ Each CSV summarizes model performance by task (`idx`), including:
 This project uses a dual-license structure:
 
 - **Code** (evaluation pipeline, scripts, utilities): [Apache License 2.0](LICENSE)
-- **Data** (tasks, rubrics, and annotations): [CC-BY-NC-4.0](DATA_LICENSE)
+- **Data** (tasks, rubrics, and annotations): Per-task license follows the source article (see [DATA_LICENSE](DATA_LICENSE))
 
 The data in this benchmark is derived from expert-authored reports released under CC-BY-4.0 / CC-BY-NC-4.0 / CC0 licenses. Each entry in `tasks_and_rubrics.jsonl` carries a `license` field that records the license of its corresponding source article:
 
@@ -390,9 +390,9 @@ The data in this benchmark is derived from expert-authored reports released unde
 | CC BY-NC 4.0 | 2 | idx=26, idx=110 |
 | CC0 | 1 | idx=119 |
 
-Accordingly, the overall dataset is distributed under CC-BY-NC-4.0 to respect the upstream NonCommercial constraint.
+Accordingly, each task's rubrics and descriptions inherit the license of their source article. For the 129 CC BY 4.0 tasks, commercial use is permitted with attribution; for idx=26 and idx=110 (CC BY-NC 4.0), commercial use is not permitted.
 
-If you use this benchmark in academic research, you are free to do so under both licenses. Commercial use of the **code** is permitted; commercial use of the **data** is not.
+If you use this benchmark in academic research, you are free to do so under all applicable licenses. Commercial use of the **code** is always permitted. Commercial use of the **data** depends on the per-task license — check the `license` field in `tasks_and_rubrics.jsonl`.
 
 ---
 
