@@ -1,7 +1,7 @@
 [project]
 name = "deepresearch-bench-2"
 version = "0.1.0"
-description = "Academic content evaluation with Gemini (PDF/DOCX/images)."
+description = "Academic content evaluation with GPT-5.5 (DOCX/Markdown)."
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.31.0",

@@ -34,8 +34,8 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
   - Our paper is now available on [arXiv (2601.08536)](https://arxiv.org/abs/2601.08536).
 
 + **[Nov 2025] 🎉 DeepResearch Bench II Evaluation Pipeline Released**  
-  - This repo provides the official evaluation pipeline for **DeepResearch Bench II**, built on Gemini with fine-grained, verifiable rubrics derived from expert-written research reports.  
-  - It supports **multimodal inputs** (PDF/DOCX/images/text) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
+  - This repo provides the official evaluation pipeline for **DeepResearch Bench II**, using GPT-5.5 with fine-grained, verifiable rubrics derived from expert-written research reports.
+  - It supports **text inputs** (DOCX/Markdown) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
 
 For complete experimental results, model comparisons, and ablation studies, please refer to the main paper (`paper/main.pdf`).
 
@@ -62,9 +62,9 @@ DeepResearch Bench II addresses key limitations of existing deep research benchm
 
 This repository (`DeepResearch-Bench-II`) contains a **lightweight evaluation pipeline** that:
 
-- Takes model-generated research reports (PDF/DOCX/HTML/TXT/images),  
+- Takes model-generated research reports (DOCX/Markdown),
 - Uses `tasks_and_rubrics.jsonl` to load **task descriptions and rubrics**, and  
-- Invokes Gemini to **score each rubric item** in batches, producing:
+- Invokes GPT-5.5 to **score each rubric item** in batches, producing:
   - Per-task, per-dimension rubric scores, and  
   - Aggregated CSVs summarizing model performance.
 
@@ -132,8 +132,8 @@ Rubrics are built through a four-stage pipeline:
 DeepResearch Bench II uses **LLM-as-judge with verifiable rubrics**:
 
 1. The **task + rubric** are serialized into a structured JSON prompt.  
-2. The **model report** (PDF/DOCX/image/text) is provided as the passage (possibly as multimodal attachments).  
-3. Gemini is prompted to output, for **each rubric item**:
+2. The **model report** (DOCX/Markdown) is extracted as text and provided as the passage.
+3. GPT-5.5 is prompted to output, for **each rubric item**:
    - `score ∈ {1, 0, -1}`,
    - `reason`, and
    - `evidence` (supporting sentences from the report).
@@ -146,11 +146,9 @@ Scoring semantics:
 
 The evaluation pipeline in this repo:
 
-- Handles **multimodal inputs**:
-  - PDFs are uploaded as binary attachments.
-  - DOCX files are parsed into text + tables (Markdown) + extracted images.
-  - Images (PNG/JPEG/WebP/GIF/BMP/TIFF) are attached as inline data.
-  - TXT/MD/HTML are loaded as plain text.
+- Handles **text-only inputs**:
+  - DOCX files are parsed into text and tables (Markdown); embedded images are ignored.
+  - Markdown files are loaded as plain text.
 - Supports **batched evaluation**:
   - Rubric items are split into batches of size `CHUNK_SIZE` (default 50).
   - Each batch is evaluated independently; results are merged and re-grouped by dimension.
@@ -181,7 +179,7 @@ please refer to the paper (`paper/main.pdf`) and any public leaderboard associat
 ### Prerequisites
 
 - Python **3.9+**
-- A Gemini-compatible API endpoint and token
+- An OpenAI or OpenAI-compatible API endpoint and key with GPT-5.5 access
 
 ---
 
@@ -198,10 +196,12 @@ vim .env  # or use your favorite editor
 **Required config** (replace with your own values):
 
 ```bash
-GEMINI_API_URL=https://your-api-endpoint.com/v1/chat/completions
-GEMINI_API_TOKEN=your-api-token
-GEMINI_MODEL=gemini-2.5-pro
-GEMINI_REQUEST_ID=eval-request-id
+OPENAI_API_URL=https://api.openai.com/v1/chat/completions
+OPENAI_API_KEY=your-api-key
+OPENAI_MODEL=gpt-5.5
+OPENAI_REASONING_EFFORT=medium
+OPENAI_MAX_OUTPUT_TOKENS=32768
+OPENAI_TIMEOUT=600
 
 PDF_DIR=report
 OUT_JSONL=result.jsonl
@@ -278,10 +278,10 @@ DeepResearch-Bench-II/
 │   └── method.png
 ├── report/                    # Input directory for model-generated reports
 │   └── <model_name>/         # Per-model subdirectories
-│       ├── idx-1.pdf         # Model output for task 1
-│       ├── idx-2.docx        # Model output for task 2
+│       ├── idx-1.docx        # Model output for task 1
+│       ├── idx-2.md          # Model output for task 2
 │       └── ...
-├── gemini_client.py           # Gemini API client (handles API calls and multimodal input)
+├── gpt_client.py              # OpenAI-compatible GPT-5.5 API client
 ├── run_evaluation.py          # Main evaluation script (batched rubric scoring logic)
 ├── aggregate_scores.py        # Score aggregation utility (produces CSV summaries)
 ├── tasks_and_rubrics.jsonl    # Tasks and rubrics (132 expert-derived tasks)
@@ -292,7 +292,7 @@ DeepResearch-Bench-II/
 └── README.md                  # This documentation
 ```
 
-> **Note**: Place your model-generated reports under `report/<model_name>/idx-*.pdf|docx|html|md|txt|...`.  
+> **Note**: Place DOCX or Markdown reports under `report/<model_name>/idx-*.docx|md`.
 > The subdirectory name becomes the model identifier in output files.
 
 ---
@@ -306,17 +306,17 @@ Organize your model-generated reports under `report` with the following structur
 ```text
 report/
 ├── ModelA/
-│   ├── idx-1.pdf
-│   ├── idx-2.pdf
+│   ├── idx-1.docx
+│   ├── idx-2.docx
 │   └── ...
 └── ModelB/
-    ├── idx-1.pdf
-    ├── idx-2.pdf
+    ├── idx-1.md
+    ├── idx-2.md
     └── ...
 ```
 
 - Subdirectory name = **model name** (used in output JSONL).  
-- File name pattern = `idx-<task_idx>.<ext>` where `<ext>` can be `pdf`, `docx`, `html`, `md`, `txt`, or an image type.
+- File name pattern = `idx-<task_idx>.<ext>` where `<ext>` is `docx` or `md`.
 
 ### 2. Run the evaluator
 
@@ -418,5 +418,4 @@ If you use DeepResearch Bench II or this evaluation pipeline in your research, p
       url={https://arxiv.org/abs/2601.08536}, 
 }
 ```
-
 

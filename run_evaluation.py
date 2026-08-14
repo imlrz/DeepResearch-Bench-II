@@ -8,13 +8,13 @@ import builtins
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple, Optional
 
-from gemini_client import GeminiClient, GeminiInput, GeminiOutput, get_config
+from gpt_client import GPTClient, GPTInput, get_config
 
 # =========================
 # Global variables
 # =========================
 # Client instance (initialized in main)
-client: Optional[GeminiClient] = None
+client: Optional[GPTClient] = None
 
 
 def get_default_config():
@@ -124,8 +124,6 @@ CRITICAL: You MUST return results for ALL rubric items in the input, and the "ru
 Now, please begin your generation
 """
 
-PAPER_PLACEHOLDER = "(The PDF is attached to this message; please treat its full content as the <passage> text when searching and editing.)"
-
 # =========================
 # Load tasks.jsonl index
 # =========================
@@ -161,39 +159,25 @@ ORIGINAL_DATA = {}
 # =========================
 # Document content extraction
 # =========================
-def _extract_docx_content(path: str) -> Tuple[str, List[Tuple[str, bytes]]]:
+def _extract_docx_content(path: str) -> str:
     """
     Extract content from a .docx file.
 
-    Returns:
-        (text_content, [(image_mime, image_bytes)]).
+    Images are intentionally ignored; GPT-5.5 evaluation is text-only.
     """
     try:
         from docx import Document  # python-docx
     except Exception as e:
         print(f"[warn] python-docx is not installed, cannot parse .docx: {e}")
-        return "", []
+        return ""
     try:
         doc = Document(path)
     except Exception as e:
         print(f"[warn] failed to read .docx file: {e}")
-        return "", []
+        return ""
     
     # Extract all contents (paragraphs + tables, in document order)
     all_content = []
-    images = []
-    
-    # Extract all images
-    for rel in doc.part.rels.values():
-        if "image" in rel.target_ref:
-            try:
-                image_blob = rel.target_part.blob
-                # Get content_type from the relationship
-                content_type = rel.target_part.content_type
-                images.append((content_type, image_blob))
-            except Exception as e:
-                print(f"[warn] failed to extract image: {e}")
-    
     # Iterate over all elements in the document body (paragraphs and tables)
     for element in doc.element.body:
         # Paragraphs
@@ -218,7 +202,7 @@ def _extract_docx_content(path: str) -> Tuple[str, List[Tuple[str, bytes]]]:
     
     content = "\n\n".join(all_content)
     
-    return content, images
+    return content
 
 def _table_to_markdown(table) -> str:
     """
@@ -290,9 +274,8 @@ def validate_batch_result(rubric_items: List[str], parsed_result: Dict) -> bool:
     
     return True
 
-def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict, 
-                       paper_content: str, pdf_path: str = None, 
-                       extra_images: List[Tuple[str, bytes]] = None,
+def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
+                       paper_content: str,
                        max_retries: int = 5) -> Tuple[Optional[List[Dict]], Dict]:
     """
     Query a batch of rubric items.
@@ -303,7 +286,7 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
     """
     global client
     if client is None:
-        raise RuntimeError("GeminiClient is not initialized")
+        raise RuntimeError("GPTClient is not initialized")
     
     rubric_input = {
         "task": task,
@@ -314,22 +297,8 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
     
     for attempt in range(max_retries):
         try:
-            # Build input
-            if pdf_path:
-                # With file attachment
-                prompt = PROMPT_TEMPLATE.format(paper=PAPER_PLACEHOLDER, rubric=rubric_json)
-                input_data = GeminiInput(
-                    text=prompt,
-                    file_path=pdf_path,
-                    extra_images=extra_images
-                )
-            else:
-                # Text-only
-                prompt = PROMPT_TEMPLATE.format(paper=paper_content, rubric=rubric_json)
-                input_data = GeminiInput(
-                    text=prompt,
-                    extra_images=extra_images
-                )
+            prompt = PROMPT_TEMPLATE.format(paper=paper_content, rubric=rubric_json)
+            input_data = GPTInput(text=prompt)
             
             # Call the client
             output = client.query(input_data)
@@ -364,7 +333,7 @@ def query_rubric_batch(rubric_items: List[str], task: str, blocked: Dict,
 # =========================
 def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chunk_size: int = 0, max_paper_chars: int = 150000, max_retries: int = 5):
     """
-    Process a single file, with batched evaluation (Gemini multimodal).
+    Process a DOCX or Markdown file with batched GPT-5.5 evaluation.
 
     Returns:
         (idx, result_dict, total_tokens)
@@ -395,44 +364,22 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
         print(f"[warn] idx={idx} has no rubric items")
         return idx, {"error": "no rubric items"}, 0
     
-    # Prepare document content (multimodal strategy)
+    # Prepare text-only document content.
     text_content = ""
-    file_to_upload = None
-    extra_images = []
     lower_name = pdf_path.lower()
     
-    if lower_name.endswith('.pdf'):
-        # For PDF, upload the file as an attachment by default
-        file_to_upload = pdf_path
-        print(f"[info] idx={idx} PDF will be uploaded as an attachment")
-    elif lower_name.endswith('.docx'):
-        # For DOCX, extract text, tables and images
-        text_content, extra_images = _extract_docx_content(pdf_path)
-        print(f"[info] idx={idx} DOCX extracted: text_length={len(text_content)}, image_count={len(extra_images)}")
-        if not text_content and not extra_images:
-            # If extraction fails, fall back to plain text
-            print(f"[warn] idx={idx} DOCX extraction failed, trying as plain text")
-    elif lower_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff')):
-        # Image file
-        file_to_upload = pdf_path
-        print(f"[info] idx={idx} image file will be uploaded as an attachment")
-    elif lower_name.endswith(('.txt', '.md', '.html')):
-        # Plain text file
+    if lower_name.endswith('.docx'):
+        text_content = _extract_docx_content(pdf_path)
+        print(f"[info] idx={idx} DOCX extracted: text_length={len(text_content)}")
+    elif lower_name.endswith('.md'):
         try:
             with open(pdf_path, 'r', encoding='utf-8', errors='ignore') as rf:
                 text_content = rf.read()
-            print(f"[info] idx={idx} text file read: length={len(text_content)}")
+            print(f"[info] idx={idx} Markdown read: length={len(text_content)}")
         except Exception as e:
-            print(f"[warn] idx={idx} failed to read text file: {e}")
-            text_content = ""
+            print(f"[warn] idx={idx} failed to read Markdown file: {e}")
     else:
-        # Unknown format, best-effort text read
-        print(f"[warn] idx={idx} unknown format, trying to read as text")
-        try:
-            with open(pdf_path, 'r', encoding='utf-8', errors='ignore') as rf:
-                text_content = rf.read()
-        except Exception:
-            text_content = ""
+        return idx, {"error": "unsupported file type; expected .docx or .md"}, 0
     
     # Truncate overly long text
     if text_content and len(text_content) > max_paper_chars:
@@ -461,9 +408,7 @@ def process_one_with_chunking(idx: int, pdf_path: str, rubric_content: Dict, chu
         print(f"[info] idx={idx} processing batch {batch_idx+1}/{len(batches)} ({len(batch_items)} items)")
         
         results, usage_metadata = query_rubric_batch(
-            batch_items, task, blocked, text_content, 
-            file_to_upload, 
-            extra_images,
+            batch_items, task, blocked, text_content,
             max_retries
         )
         
@@ -537,7 +482,6 @@ def main():
     parser.add_argument("--model", default=None, help="Model name (optional, overrides .env / environment).")
     parser.add_argument("--api_url", default=None, help="API URL (optional, overrides .env / environment).")
     parser.add_argument("--token", default=None, help="API token (optional, overrides .env / environment).")
-    parser.add_argument("--req_id", default=None, help="Request identifier (optional, overrides .env / environment).")
     args = parser.parse_args()
     
     # Initialize print logger: mirror all prints into the log file
@@ -547,22 +491,20 @@ def main():
     # Load tasks data
     TASKS_DATA, ORIGINAL_DATA = load_tasks_data(args.tasks_jsonl)
     
-    # Initialize Gemini client (from .env or CLI overrides)
+    # Initialize GPT-5.5 client (from .env or CLI overrides)
     try:
-        client = GeminiClient(
+        client = GPTClient(
             api_url=args.api_url,
-            api_token=args.token,
+            api_key=args.token,
             model=args.model,
-            request_id=args.req_id,
             verbose=True
         )
-        print(f"[init] Gemini client initialized")
+        print(f"[init] GPT client initialized")
         print(f"  - model: {client.model}")
         print(f"  - API URL: {client.api_url}")
-        print(f"  - request ID: {client.request_id}")
     except ValueError as e:
         print(f"[err] failed to initialize client: {e}")
-        print(f"[hint] Please create a .env file and configure GEMINI_API_URL / GEMINI_API_TOKEN / GEMINI_MODEL, or pass them via CLI arguments.")
+        print(f"[hint] Please configure OPENAI_API_KEY in .env or pass --token.")
         return
     
     # Use local variables for convenience
@@ -592,6 +534,8 @@ def main():
             continue
         model_name = entry
         for fname in os.listdir(model_dir):
+            if not fname.lower().endswith(('.docx', '.md')):
+                continue
             idx_val = _parse_idx_from_filename(fname)
             if idx_val is None:
                 continue
