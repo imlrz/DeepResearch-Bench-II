@@ -17,6 +17,16 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
 
 # ✨ News
 
++ **[Aug 2026] 🔄 Official Evaluator Migrated to GPT-5.5**
+  - Google has scheduled `gemini-2.5-pro` for retirement on Vertex AI on
+    [October 20, 2026](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions).
+  - To keep the official evaluation pipeline reproducible and available, we
+    have migrated the default evaluator from Gemini 2.5 Pro to
+    [GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5).
+  - The previous Gemini 2.5 Pro evaluator remains available on the
+    [`gemini-25`](https://github.com/imlrz/DeepResearch-Bench-II/tree/gemini-25)
+    branch.
+
 + **[May 2026] 📜 Per-task License Metadata Added**  
   - Each entry in `tasks_and_rubrics.jsonl` now includes a `license` field indicating the license of its source article.  
   - Except for idx=26 and idx=110 (CC BY-NC 4.0) and idx=119 (CC0), all other tasks are derived from CC BY 4.0 sources.  
@@ -34,8 +44,8 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
   - Our paper is now available on [arXiv (2601.08536)](https://arxiv.org/abs/2601.08536).
 
 + **[Nov 2025] 🎉 DeepResearch Bench II Evaluation Pipeline Released**  
-  - This repo provides the official evaluation pipeline for **DeepResearch Bench II**, using GPT-5.5 with fine-grained, verifiable rubrics derived from expert-written research reports.
-  - It supports **text inputs** (DOCX/Markdown) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
+  - The initial official evaluation pipeline for **DeepResearch Bench II** used Gemini 2.5 Pro with fine-grained, verifiable rubrics derived from expert-written research reports.
+  - It supported **multimodal inputs** (PDF/DOCX/images/text) and **batched rubric-based evaluation** for information recall, analysis, and presentation.
 
 For complete experimental results, model comparisons, and ablation studies, please refer to the main paper (`paper/main.pdf`).
 
@@ -156,6 +166,24 @@ The evaluation pipeline in this repo:
   - Per batch (`usageMetadata`),  
   - Per file, and  
   - Per model across the whole run.
+
+### Evaluator consistency study
+
+We compared three candidate evaluators against human annotations on the same
+10 reports, covering 738 matched rubric-level judgments. All evaluators used
+the same task definitions, rubric items, three-way labels, and evaluation
+prompt.
+
+| Evaluator | 3-way accuracy | Cohen's κ | Info recall | Analysis | Presentation | Task-level Pearson r | Reported tokens |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **GPT-5.5** | **91.19%** | **0.7993** | 92.10% | **87.69%** | **90.20%** | **0.9587** | **328,333** |
+| Gemini 3.1 Pro Preview | 91.06% | 0.7896 | **92.46%** | 85.38% | **90.20%** | 0.8689 | 440,459 |
+| Claude Opus 4.8 | 83.33% | 0.6479 | 84.56% | 77.69% | 84.31% | 0.8376 | 428,222 |
+
+GPT-5.5 achieved the highest overall exact-match accuracy, Cohen's κ, and
+task-level correlation while using 25.5% fewer reported tokens than Gemini
+3.1 Pro Preview. This is a small-scale evaluator agreement study rather than a
+leaderboard comparison; token counts cover accepted evaluation outputs.
 
 ---
 
@@ -418,4 +446,3 @@ If you use DeepResearch Bench II or this evaluation pipeline in your research, p
       url={https://arxiv.org/abs/2601.08536}, 
 }
 ```
-
