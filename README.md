@@ -38,7 +38,7 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
 + **[Feb 2026] 🌐 Official Website & Leaderboard Released**  
   - The official [DeepResearch Bench II Website](https://agentresearchlab.org/benchmarks/deepresearch-bench-ii/index.html#home) is now live!  
   - Check out the [Leaderboard](https://agentresearchlab.org/benchmarks/deepresearch-bench-ii/index.html#leaderboard) to see how SOTA deep research agents compare across 9,430 expert-written rubrics.
-  - 🎯 **Welcome to submit your model!** Contact us at imlrz@mail.ustc.edu.cn or dumingxuan@mail.ustc.edu.cn to join the leaderboard.
+  - 🎯 **Welcome to submit your model!** See the [submission requirements](#-submit-to-leaderboard) and contact us at imlrz@mail.ustc.edu.cn or dumingxuan@mail.ustc.edu.cn.
 
 + **[Jan 2026] 📄 Paper Released on arXiv**  
   - Our paper is now available on [arXiv (2601.08536)](https://arxiv.org/abs/2601.08536).
@@ -199,6 +199,47 @@ For full experimental details, including:
 - Error cases and ablations,
 
 please refer to the paper (`paper/main.pdf`) and any public leaderboard associated with DeepResearch Bench II.
+
+---
+
+## 🏆 Submit to Leaderboard
+
+To request an official leaderboard entry, contact:
+
+- `imlrz@mail.ustc.edu.cn`
+- `dumingxuan@mail.ustc.edu.cn`
+
+Please prepare the following materials:
+
+1. **A working temporary API key with access to GPT-5.5**
+   - The key is required so that we can reproduce and verify the official
+     evaluation under the same evaluator configuration.
+   - It must remain valid and have sufficient quota for the agreed evaluation
+     window.
+   - Official OpenAI keys and keys for OpenAI-compatible endpoints are
+     supported. For a compatible provider, also include the endpoint URL and
+     exact model name.
+   - Use a scoped, revocable key intended only for this evaluation, and revoke
+     it after we confirm that evaluation is complete.
+2. **Raw generated reports**
+   - Provide one `idx-<task_idx>.docx` or `idx-<task_idx>.md` file per task,
+     following the `report/<model_name>/` layout used by this repository.
+3. **Reproducibility information**
+   - For an open-source model or agent, provide the repository and instructions
+     needed to reproduce the reports.
+   - For a closed-source system, provide its product page and/or API link.
+4. **Model metadata**
+   - Model and project names, project link, organization, and open-source
+     license or proprietary status.
+
+If available, you may also include your local `result.jsonl` and aggregated
+CSVs to speed up verification. Official leaderboard scores are recomputed by
+the maintainers.
+
+> **API key safety:** Do not commit a key to Git, attach it to a public issue or
+> pull request, or include it in the report files. Contact us first by email to
+> arrange private transfer of the temporary credential. The key is used only
+> for submission verification and evaluation.
 
 ---
 
