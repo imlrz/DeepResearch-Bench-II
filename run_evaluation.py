@@ -230,12 +230,18 @@ def _table_to_markdown(table) -> str:
 FENCED_JSON_PATTERN = r'```json\s*(.*)```'
 
 def _try_clean_and_load(s: str):
+    text = s.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
     json_clean = re.sub(
         r'"(?P<k>.*?)"(?=\s*:)',
         lambda m: '"' + re.sub(r'(?<!\\)"', r'\"', m.group('k')) + '"',
-        s
+        text
     )
-    return json.loads(json_clean.strip())
+    return json.loads(json_clean)
 
 def parse_model_text(text: str):
     matches = re.findall(FENCED_JSON_PATTERN, text, re.DOTALL)
