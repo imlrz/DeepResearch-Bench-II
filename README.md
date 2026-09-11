@@ -1,4 +1,4 @@
-<h1 align="center">DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Report</h1>
+<h1 align="center">DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Reports</h1>
 
 <div align="center">
 
@@ -479,7 +479,7 @@ If you use DeepResearch Bench II or this evaluation pipeline in your research, p
 
 ```bibtex
 @misc{li2026deepresearchbenchiidiagnosing,
-      title={DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Report}, 
+      title={DeepResearch Bench II: Diagnosing Deep Research Agents via Rubrics from Expert Reports}, 
       author={Ruizhe Li and Mingxuan Du and Benfeng Xu and Chiwei Zhu and Xiaorui Wang and Zhendong Mao},
       year={2026},
       eprint={2601.08536},
