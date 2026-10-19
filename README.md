@@ -17,6 +17,15 @@ If you like our project, please give us a star ⭐ on GitHub for the latest upda
 
 # ✨ News
 
++ **[Oct 2026] GPT-5.5 Leaderboard Submission and Scoring Update**
+  - New DeepResearch Bench II submissions are accepted only for the
+    [GPT-5.5 Eval leaderboard](https://huggingface.co/spaces/muset-ai/DeepResearch-Bench-Leaderboard).
+    The Gemini 2.5 Eval leaderboard remains available as a historical view.
+  - Tasks 112 and 114 are temporarily excluded from leaderboard scoring due
+    to identified issues. Current GPT-5.5 scores average each system's valid
+    results among the remaining 130 tasks. After expert review and repair,
+    these two tasks may be included again.
+
 + **[Aug 2026] 🔄 Official Evaluator Migrated to GPT-5.5**
   - Google has scheduled `gemini-2.5-pro` for retirement on Vertex AI on
     [October 20, 2026](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions).
@@ -203,6 +212,10 @@ please refer to the paper (`paper/main.pdf`) and any public leaderboard associat
 ---
 
 ## 🏆 Submit to Leaderboard
+
+New submissions are accepted only for the GPT-5.5 Eval leaderboard. Tasks 112
+and 114 are temporarily excluded from official leaderboard scores; the
+benchmark dataset still contains all 132 tasks.
 
 To request an official leaderboard entry, contact:
 
